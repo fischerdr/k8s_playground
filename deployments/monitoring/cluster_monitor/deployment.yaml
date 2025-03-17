@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cluster-monitor
+  namespace: monitoring
+  labels:
+    app: cluster-monitor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cluster-monitor
+  template:
+    metadata:
+      labels:
+        app: cluster-monitor
+    spec:
+      serviceAccountName: cluster-monitor
+      containers:
+      - name: cluster-monitor
+        image: k8s-playground/cluster-monitor:latest
+        imagePullPolicy: IfNotPresent
+        args:
+          - "monitor"
+          - "--interval=60"
+          - "--output=prometheus"
+        ports:
+        - containerPort: 9090
+          name: metrics
+        resources:
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 9090
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 9090
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        env:
+        - name: K8S_MONITOR_LOG_LEVEL
+          value: "INFO"
+        - name: K8S_MONITOR_OUTPUT_FORMAT
+          value: "prometheus"
+        - name: K8S_MONITOR_PROMETHEUS_PORT
+          value: "9090"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cluster-monitor
+  namespace: monitoring
+  labels:
+    app: cluster-monitor
+spec:
+  selector:
+    app: cluster-monitor
+  ports:
+  - port: 9090
+    targetPort: metrics
+    name: metrics
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cluster-monitor
+  namespace: monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-monitor
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["nodes", "pods"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-monitor
+subjects:
+- kind: ServiceAccount
+  name: cluster-monitor
+  namespace: monitoring
+roleRef:
+  kind: ClusterRole
+  name: cluster-monitor
+  apiGroup: rbac.authorization.k8s.io

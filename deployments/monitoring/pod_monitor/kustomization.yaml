@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+
+resources:
+  - deployment.yaml
+  - service.yaml
+  - configmap.yaml
+  - secret.yaml
+  - rbac.yaml
+
+commonLabels:
+  app: pod-monitor
+  component: monitoring
+
+configMapGenerator:
+  - name: pod-monitor-config
+    behavior: merge
+    literals:
+      - monitoring_interval=60
+      - log_level=INFO
+
+secretGenerator:
+  - name: pod-monitor-vmware-credentials
+    behavior: merge
+    type: Opaque
+    envs:
+      - .env.secret  # This file should be created locally and not committed to version control
+
+images:
+  - name: k8s-playground/pod-monitor
+    newTag: latest

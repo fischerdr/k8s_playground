@@ -1,0 +1,101 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-monitor
+  namespace: monitoring
+  labels:
+    app: pod-monitor
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pod-monitor
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: pod-monitor
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: pod-monitor
+      containers:
+      - name: pod-monitor
+        image: k8s-playground/pod-monitor:latest
+        imagePullPolicy: IfNotPresent
+        args:
+          - "monitor"
+          - "--config=/etc/pod-monitor/config.yaml"
+        ports:
+        - containerPort: 9090
+          name: metrics
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "200m"
+            memory: "256Mi"
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        volumeMounts:
+        - name: config
+          mountPath: /etc/pod-monitor
+          readOnly: true
+        - name: vmware-credentials
+          mountPath: /etc/pod-monitor/secrets
+          readOnly: true
+        env:
+        - name: POD_MONITOR_LOG_LEVEL
+          valueFrom:
+            configMapKeyRef:
+              name: pod-monitor-config
+              key: log_level
+        - name: POD_MONITOR_NAMESPACES
+          valueFrom:
+            configMapKeyRef:
+              name: pod-monitor-config
+              key: namespaces
+        - name: POD_MONITOR_POD_PROBLEMATIC_THRESHOLD
+          valueFrom:
+            configMapKeyRef:
+              name: pod-monitor-config
+              key: pod_problematic_threshold
+        - name: POD_MONITOR_VMWARE_HOST
+          valueFrom:
+            secretKeyRef:
+              name: pod-monitor-vmware-credentials
+              key: host
+        - name: POD_MONITOR_VMWARE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: pod-monitor-vmware-credentials
+              key: username
+        - name: POD_MONITOR_VMWARE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: pod-monitor-vmware-credentials
+              key: password
+      volumes:
+      - name: config
+        configMap:
+          name: pod-monitor-config
+      - name: vmware-credentials
+        secret:
+          secretName: pod-monitor-vmware-credentials

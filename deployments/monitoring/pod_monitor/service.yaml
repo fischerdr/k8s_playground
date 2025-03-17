@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: pod-monitor
+  namespace: monitoring
+  labels:
+    app: pod-monitor
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  selector:
+    app: pod-monitor
+  ports:
+  - port: 9090
+    targetPort: metrics
+    name: metrics
+  type: ClusterIP

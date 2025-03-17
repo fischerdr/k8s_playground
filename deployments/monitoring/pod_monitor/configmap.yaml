@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pod-monitor-config
+  namespace: monitoring
+  labels:
+    app: pod-monitor
+data:
+  config.yaml: |
+    # Pod Monitor Configuration
+    
+    # Kubernetes configuration
+    namespaces:
+      - default
+      - monitoring
+      - kube-system
+    
+    # Monitoring configuration
+    pod_problematic_threshold: 300  # 5 minutes in seconds
+    monitoring_interval: 60  # 1 minute in seconds
+    
+    # Prometheus configuration
+    prometheus_port: 9090
+    
+    # Logging configuration
+    log_level: "INFO"
+    
+    # Rate limiting configuration
+    rate_limit_api_calls: true
+    rate_limit_interval: 5  # 5 seconds between API calls
+    
+    # VMware configuration
+    vmware:
+      port: 443
+      disable_ssl_verification: false
+  
+  # Individual configuration values for environment variables
+  log_level: "INFO"
+  namespaces: "default,monitoring,kube-system"
+  pod_problematic_threshold: "300"
+  monitoring_interval: "60"
+  prometheus_port: "9090"
+  rate_limit_api_calls: "true"
+  rate_limit_interval: "5"
