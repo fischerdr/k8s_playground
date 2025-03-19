@@ -4,9 +4,9 @@ This module provides services for exposing metrics to Prometheus.
 """
 
 import logging
-from typing import List
+from typing import List, Optional
 
-from prometheus_client import Counter, Gauge, make_asgi_app
+from prometheus_client import CollectorRegistry, Counter, Gauge, make_asgi_app
 
 from ..models.metrics import NodeMetric, PodMetric, VMwareMetric
 
@@ -16,78 +16,97 @@ log = logging.getLogger(__name__)
 class PrometheusService:
     """Service for exposing metrics to Prometheus."""
 
-    def __init__(self) -> None:
-        """Initialize the Prometheus service."""
+    def __init__(self, registry: Optional[CollectorRegistry] = None) -> None:
+        """Initialize the Prometheus service.
+
+        Args:
+            registry: Optional custom registry to use. If None, the default registry is used.
+                     This is useful for testing to avoid duplicate registration errors.
+        """
+        # Use provided registry or create a new one for testing
+        self.registry = registry or CollectorRegistry()
+
         # Create metrics
         self.pod_status_gauge = Gauge(
             "k8s_pod_status",
             "Status of Kubernetes pods (0=problematic, 1=ok)",
             ["namespace", "pod", "status", "node"],
+            registry=self.registry,
         )
 
         self.pod_age_gauge = Gauge(
             "k8s_pod_age_seconds",
             "Age of Kubernetes pods in seconds",
             ["namespace", "pod", "status", "node"],
+            registry=self.registry,
         )
 
         self.container_status_gauge = Gauge(
             "k8s_container_status",
             "Status of Kubernetes containers (0=problematic, 1=ok)",
             ["namespace", "pod", "container", "status"],
+            registry=self.registry,
         )
 
         self.node_status_gauge = Gauge(
             "k8s_node_status",
             "Status of Kubernetes nodes (0=problematic, 1=ok)",
             ["node", "status", "vmware_machine"],
+            registry=self.registry,
         )
 
         self.node_condition_gauge = Gauge(
             "k8s_node_condition",
             "Conditions of Kubernetes nodes (0=false, 1=true)",
             ["node", "condition"],
+            registry=self.registry,
         )
 
         self.vmware_status_gauge = Gauge(
             "vmware_machine_status",
             "Status of VMware machines (0=problematic, 1=ok)",
             ["vmware_machine", "status", "node"],
+            registry=self.registry,
         )
 
         self.vmware_cpu_usage_gauge = Gauge(
             "vmware_machine_cpu_usage",
             "CPU usage of VMware machines in MHz",
             ["vmware_machine", "node"],
+            registry=self.registry,
         )
 
         self.vmware_memory_usage_gauge = Gauge(
             "vmware_machine_memory_usage",
             "Memory usage of VMware machines in bytes",
             ["vmware_machine", "node"],
+            registry=self.registry,
         )
 
         self.vmware_cpu_percent_gauge = Gauge(
             "vmware_machine_cpu_percent",
             "CPU usage percentage of VMware machines",
             ["vmware_machine", "node"],
+            registry=self.registry,
         )
 
         self.vmware_memory_percent_gauge = Gauge(
             "vmware_machine_memory_percent",
             "Memory usage percentage of VMware machines",
             ["vmware_machine", "node"],
+            registry=self.registry,
         )
 
         self.alert_counter = Counter(
             "k8s_monitor_alerts_total",
             "Total number of alerts generated",
             ["alert_type", "resource_type"],
+            registry=self.registry,
         )
 
     def get_app(self):
         """Return the ASGI app for exposing metrics to Prometheus."""
-        return make_asgi_app()
+        return make_asgi_app(registry=self.registry)
 
     def update_pod_metrics(self, pod_metrics: List[PodMetric]) -> None:
         """Update Prometheus metrics for pods.

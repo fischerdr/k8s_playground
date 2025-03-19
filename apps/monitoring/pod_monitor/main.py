@@ -247,19 +247,19 @@ def monitor_iteration(config: Config) -> None:
 
 
 @api_app.get("/health")
-def health() -> Response:
-    global health_status
-    if kubernetes_service and prometheus_service:
-        health_status = {"status": "ok"}
-    else:
-        health_status = {"status": "unhealthy"}
-    return Response(content="ok", status_code=200)
+def health():
+    """Health check endpoint."""
+    status_code = 200
+    if health_status.get("status") == "error":
+        status_code = 500
+    return health_status
 
 
 @api_app.get("/metrics")
 def metrics():
+    """Metrics endpoint for Prometheus."""
     # This endpoint will be handled by the Prometheus client
-    pass
+    return prometheus_service.get_app()
 
 
 def start_api_server() -> None:

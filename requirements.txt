@@ -1,7 +1,8 @@
 kubernetes>=28.1.0
 pyyaml>=6.0
-requests>=2.31.0
 rich>=13.6.0
 typer>=0.9.0
 pyvmomi>=8.0.0  # For VMware integration
 prometheus-client>=0.17.0  # For monitoring
+fastapi>=0.104.0
+uvicorn>=0.23.2

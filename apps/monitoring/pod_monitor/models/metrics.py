@@ -211,21 +211,24 @@ class VMwareMetric:
 
         # Basic status metric (0 = problematic, 1 = ok)
         status_value = 0 if self.is_problematic else 1
-        labels = f'vmware_machine="{self.name}",status="{self.status}",node="{self.node_name}"'
+        status_labels = (
+            f'vmware_machine="{self.name}",status="{self.status}",node="{self.node_name}"'
+        )
+        base_labels = f'vmware_machine="{self.name}",node="{self.node_name}"'
 
-        metrics.append(f"vmware_machine_status{{{labels}}} {status_value}")
+        metrics.append(f"vmware_machine_status{{{status_labels}}} {status_value}")
 
         # Add resource metrics if available
         if self.cpu_usage is not None:
-            metrics.append(f"vmware_machine_cpu_usage{{{labels}}} {self.cpu_usage}")
+            metrics.append(f"vmware_machine_cpu_usage{{{base_labels}}} {self.cpu_usage}")
 
         if self.memory_usage is not None:
-            metrics.append(f"vmware_machine_memory_usage{{{labels}}} {self.memory_usage}")
+            metrics.append(f"vmware_machine_memory_usage{{{base_labels}}} {self.memory_usage}")
 
         if self.cpu_percent is not None:
-            metrics.append(f"vmware_machine_cpu_percent{{{labels}}} {self.cpu_percent}")
+            metrics.append(f"vmware_machine_cpu_percent{{{base_labels}}} {self.cpu_percent}")
 
         if self.memory_percent is not None:
-            metrics.append(f"vmware_machine_memory_percent{{{labels}}} {self.memory_percent}")
+            metrics.append(f"vmware_machine_memory_percent{{{base_labels}}} {self.memory_percent}")
 
         return metrics
