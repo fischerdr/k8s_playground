@@ -7,15 +7,15 @@ This module serves as the entry point for the Pod Monitor application.
 import logging
 import signal
 import sys
+import threading
 import time
 from typing import Optional
 
 import typer
+import uvicorn
+from fastapi import FastAPI, Response
 from rich.console import Console
 from rich.logging import RichHandler
-from fastapi import FastAPI, Response
-import uvicorn
-import threading
 
 from .services.kubernetes_service import KubernetesMonitorService
 from .services.prometheus_service import PrometheusService
@@ -113,7 +113,7 @@ def monitor(
         # Initialize services
         kubernetes_service = KubernetesMonitorService(config.kubeconfig_path)
         prometheus_service = PrometheusService()
-        
+
         # Update health status
         health_status = {"status": "initializing"}
 
@@ -126,12 +126,12 @@ def monitor(
                 port=config.vmware.port,
                 disable_ssl_verification=config.vmware.disable_ssl_verification,
             )
-        
+
         # Update health status
         health_status = {"status": "ok"}
 
         log.info(f"Starting monitoring with interval: {config.monitoring_interval}s")
-        
+
         # Main monitoring loop
         while running:
             try:
@@ -139,7 +139,7 @@ def monitor(
             except Exception as e:
                 log.error(f"Error in monitoring iteration: {e}", exc_info=True)
                 health_status = {"status": "degraded", "error": str(e)}
-                
+
             time.sleep(config.monitoring_interval)
 
     except Exception as e:
@@ -267,7 +267,7 @@ def start_api_server() -> None:
     if prometheus_service:
         metrics_app = prometheus_service.get_app()
         api_app.mount("/metrics", metrics_app)
-    
+
     # Start the API server
     uvicorn.run(api_app, host="0.0.0.0", port=9090)
 
