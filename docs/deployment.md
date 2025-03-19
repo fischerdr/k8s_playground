@@ -20,6 +20,11 @@ This document provides detailed instructions for deploying the Kubernetes Playgr
       - [1. Using ConfigMap](#1-using-configmap)
       - [2. Using Environment Variables](#2-using-environment-variables)
     - [VMware Integration](#vmware-integration)
+    - [Production-Ready Features](#production-ready-features)
+      - [High Availability](#high-availability)
+      - [Security](#security)
+      - [Observability](#observability)
+      - [Resource Management](#resource-management)
   - [Cluster Monitor Deployment](#cluster-monitor-deployment)
   - [Troubleshooting](#troubleshooting)
     - [Common Issues](#common-issues)
@@ -100,6 +105,28 @@ docker build -t k8s-playground/pod-monitor:latest .
     ```bash
     kubectl apply -f deployments/monitoring/pod_monitor/service.yaml
     ```
+
+7. Deploy the PodDisruptionBudget for high availability:
+
+    ```bash
+    kubectl apply -f deployments/monitoring/pod_monitor/pdb.yaml
+    ```
+
+8. Deploy the NetworkPolicy for enhanced security:
+
+    ```bash
+    kubectl apply -f deployments/monitoring/pod_monitor/network-policy.yaml
+    ```
+
+Alternatively, you can use Kustomize to deploy all resources at once:
+
+```bash
+# For production environment
+kubectl apply -k deployments/monitoring/pod_monitor/overlays/production
+
+# For development environment
+kubectl apply -k deployments/monitoring/pod_monitor/overlays/development
+```
 
 ### Configuration Options
 
@@ -188,6 +215,36 @@ kubectl label node worker-1 vm-name=worker-1-vm
 
 Note: If the `vm-name` label is not present, the system will use the node name as the VMware guest name.
 
+### Production-Ready Features
+
+The Pod Monitor includes several production-ready features to ensure reliability, security, and observability:
+
+#### High Availability
+
+- **Replicas**: The production deployment uses 3 replicas for high availability
+- **Rolling Updates**: Configured with `maxSurge: 1` and `maxUnavailable: 0` for zero-downtime updates
+- **PodDisruptionBudget**: Ensures at least one pod is always available during voluntary disruptions
+- **Health Probes**: Includes liveness, readiness, and startup probes for better resilience
+
+#### Security
+
+- **RBAC**: Proper role-based access control with a dedicated ServiceAccount
+- **SecurityContext**: Runs as non-root user with minimal capabilities
+- **NetworkPolicy**: Restricts inbound and outbound traffic to only what's necessary
+- **Secrets Management**: Sensitive credentials stored in Kubernetes Secrets
+
+#### Observability
+
+- **Prometheus Integration**: Exposes metrics for Prometheus scraping
+- **Health Endpoints**: Provides `/health` endpoint for monitoring application health
+- **Logging**: Configurable log levels with structured logging
+
+#### Resource Management
+
+- **Resource Limits**: Properly defined CPU and memory limits and requests
+- **Environment-Specific Configurations**: Separate configurations for production and development
+- **Kustomize Overlays**: Easy customization for different environments
+
 ## Cluster Monitor Deployment
 
 The Cluster Monitor deployment follows a similar pattern to the Pod Monitor. Refer to the specific deployment files in `deployments/monitoring/cluster_monitor/` for details.
@@ -210,6 +267,11 @@ The Cluster Monitor deployment follows a similar pattern to the Pod Monitor. Ref
    - Verify the service is correctly exposing port 9090
    - Check that Prometheus is configured to scrape the pod-monitor endpoint
    - Verify the pod-monitor has the correct annotations for Prometheus discovery
+
+4. **Health checks failing**:
+   - Check the pod logs for any errors
+   - Verify the application is properly initialized
+   - Check if the `/health` endpoint is responding correctly
 
 ### Logs and Debugging
 

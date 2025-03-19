@@ -1,0 +1,12 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pod-monitor-pdb
+  namespace: monitoring
+  labels:
+    app: pod-monitor
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pod-monitor

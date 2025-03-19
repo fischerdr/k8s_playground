@@ -13,6 +13,9 @@ from typing import Optional
 import typer
 from rich.console import Console
 from rich.logging import RichHandler
+from fastapi import FastAPI, Response
+import uvicorn
+import threading
 
 from .services.kubernetes_service import KubernetesMonitorService
 from .services.prometheus_service import PrometheusService
@@ -23,11 +26,15 @@ from .utils.config import Config, load_config
 app = typer.Typer(help="Kubernetes Pod Monitor")
 console = Console()
 
+# Initialize FastAPI app for health checks and metrics
+api_app = FastAPI(title="Pod Monitor API")
+
 # Global variables
 running = True
 kubernetes_service = None
 vmware_service = None
 prometheus_service = None
+health_status = {"status": "starting"}
 
 
 def setup_logging(log_level: str = "INFO") -> None:
@@ -69,64 +76,76 @@ def monitor(
     ),
     log_level: str = typer.Option("INFO", "--log-level", "-l", help="Logging level"),
 ) -> None:
-    """Monitor Kubernetes pods, nodes, and VMware machines."""
+    """Monitor Kubernetes pods, nodes, and VMware machines.
+
+    Args:
+        config_path: Path to configuration file
+        namespace: Namespace to monitor (overrides config)
+        interval: Monitoring interval in seconds (overrides config)
+        log_level: Logging level
+    """
+    global kubernetes_service, vmware_service, prometheus_service, health_status
+
     # Set up logging
     setup_logging(log_level)
-    log = logging.getLogger("pod_monitor")
+    log = logging.getLogger(__name__)
 
-    # Set up signal handlers
+    # Set up signal handler
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    # Load configuration
-    config = load_config(config_path)
+    # Start API server in a separate thread
+    api_thread = threading.Thread(target=start_api_server, daemon=True)
+    api_thread.start()
+    log.info("API server started on port 9090")
 
-    # Override configuration with command line arguments
-    if namespace:
-        config.namespaces = [namespace]
-
-    if interval:
-        config.monitoring_interval = interval
-
-    log.info(f"Starting pod monitor with interval: {config.monitoring_interval}s")
-    log.info(f"Monitoring namespaces: {', '.join(config.namespaces)}")
-
-    # Initialize services
-    global kubernetes_service, vmware_service, prometheus_service
-
-    kubernetes_service = KubernetesMonitorService(config.kubeconfig_path)
-    kubernetes_service.pod_problematic_threshold = config.pod_problematic_threshold
-
-    # Initialize VMware service if configured
-    if config.vmware:
-        log.info(f"Initializing VMware service for host: {config.vmware.host}")
-        vmware_service = VMwareMonitorService(
-            host=config.vmware.host,
-            username=config.vmware.username,
-            password=config.vmware.password,
-            port=config.vmware.port,
-            disable_ssl_verification=config.vmware.disable_ssl_verification,
-        )
-
-    # Initialize Prometheus service
-    prometheus_service = PrometheusService(config.prometheus_port)
-    prometheus_service.start_server()
-
-    # Main monitoring loop
     try:
-        while running:
-            monitor_iteration(config)
+        # Load configuration
+        config = load_config(config_path)
+        log.info(f"Configuration loaded: {config}")
 
-            # Sleep until next iteration
-            for _ in range(config.monitoring_interval):
-                if not running:
-                    break
-                time.sleep(1)
+        # Override configuration with command-line arguments
+        if namespace:
+            config.namespaces = [namespace]
+        if interval:
+            config.monitoring_interval = interval
+
+        # Initialize services
+        kubernetes_service = KubernetesMonitorService(config.kubeconfig_path)
+        prometheus_service = PrometheusService()
+        
+        # Update health status
+        health_status = {"status": "initializing"}
+
+        # Initialize VMware service if configured
+        if config.vmware and config.vmware.host:
+            vmware_service = VMwareMonitorService(
+                host=config.vmware.host,
+                username=config.vmware.username,
+                password=config.vmware.password,
+                port=config.vmware.port,
+                disable_ssl_verification=config.vmware.disable_ssl_verification,
+            )
+        
+        # Update health status
+        health_status = {"status": "ok"}
+
+        log.info(f"Starting monitoring with interval: {config.monitoring_interval}s")
+        
+        # Main monitoring loop
+        while running:
+            try:
+                monitor_iteration(config)
+            except Exception as e:
+                log.error(f"Error in monitoring iteration: {e}", exc_info=True)
+                health_status = {"status": "degraded", "error": str(e)}
+                
+            time.sleep(config.monitoring_interval)
+
     except Exception as e:
-        log.error(f"Error in monitoring loop: {e}", exc_info=True)
+        log.error(f"Error in monitor: {e}", exc_info=True)
+        health_status = {"status": "error", "error": str(e)}
         sys.exit(1)
-    finally:
-        log.info("Shutting down pod monitor")
 
 
 def monitor_iteration(config: Config) -> None:
@@ -225,6 +244,32 @@ def monitor_iteration(config: Config) -> None:
 
     except Exception as e:
         log.error(f"Error in monitoring iteration: {e}", exc_info=True)
+
+
+@api_app.get("/health")
+def health() -> Response:
+    global health_status
+    if kubernetes_service and prometheus_service:
+        health_status = {"status": "ok"}
+    else:
+        health_status = {"status": "unhealthy"}
+    return Response(content="ok", status_code=200)
+
+
+@api_app.get("/metrics")
+def metrics():
+    # This endpoint will be handled by the Prometheus client
+    pass
+
+
+def start_api_server() -> None:
+    # Mount Prometheus metrics
+    if prometheus_service:
+        metrics_app = prometheus_service.get_app()
+        api_app.mount("/metrics", metrics_app)
+    
+    # Start the API server
+    uvicorn.run(api_app, host="0.0.0.0", port=9090)
 
 
 if __name__ == "__main__":

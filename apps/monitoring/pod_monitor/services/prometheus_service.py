@@ -4,30 +4,20 @@ This module provides services for exposing metrics to Prometheus.
 """
 
 import logging
-import threading
-import time
-from typing import Callable, Dict, List, Optional
+from typing import List
 
-from prometheus_client import Counter, Gauge, start_http_server
+from prometheus_client import Counter, Gauge, make_asgi_app
 
 from ..models.metrics import NodeMetric, PodMetric, VMwareMetric
 
-log = logging.getLogger("pod_monitor")
+log = logging.getLogger(__name__)
 
 
 class PrometheusService:
     """Service for exposing metrics to Prometheus."""
 
-    def __init__(self, port: int = 9090) -> None:
-        """Initialize the Prometheus service.
-
-        Args:
-            port: Port to expose metrics on
-        """
-        self.port = port
-        self.server_started = False
-        self.server_thread = None
-
+    def __init__(self) -> None:
+        """Initialize the Prometheus service."""
         # Create metrics
         self.pod_status_gauge = Gauge(
             "k8s_pod_status",
@@ -95,28 +85,9 @@ class PrometheusService:
             ["alert_type", "resource_type"],
         )
 
-    def start_server(self) -> None:
-        """Start the Prometheus metrics server."""
-        if not self.server_started:
-            log.info(f"Starting Prometheus metrics server on port {self.port}")
-
-            def server_thread_func():
-                start_http_server(self.port)
-                log.info(f"Prometheus metrics server started on port {self.port}")
-
-                # Keep thread alive
-                while True:
-                    time.sleep(60)
-
-            self.server_thread = threading.Thread(
-                target=server_thread_func,
-                daemon=True,
-            )
-            self.server_thread.start()
-
-            self.server_started = True
-        else:
-            log.warning("Prometheus metrics server already started")
+    def get_app(self):
+        """Return the ASGI app for exposing metrics to Prometheus."""
+        return make_asgi_app()
 
     def update_pod_metrics(self, pod_metrics: List[PodMetric]) -> None:
         """Update Prometheus metrics for pods.

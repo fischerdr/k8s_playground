@@ -9,6 +9,8 @@ resources:
   - configmap.yaml
   - secret.yaml
   - rbac.yaml
+  - pdb.yaml
+  - network-policy.yaml
 
 commonLabels:
   app: pod-monitor
