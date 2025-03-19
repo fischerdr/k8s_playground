@@ -6,7 +6,7 @@ This module serves as the entry point for the Kubernetes Cluster Monitor applica
 
 import logging
 import sys
-from typing import Dict, List, Optional
+from typing import Optional
 
 import typer
 from rich.console import Console

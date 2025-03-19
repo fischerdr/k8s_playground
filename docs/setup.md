@@ -88,31 +88,78 @@ For building container images:
 
 ## VMware Integration Setup
 
-For applications that integrate with VMware:
+The VMware integration allows our monitoring applications to check the status of the VMware infrastructure that hosts our Kubernetes nodes. This is particularly useful for troubleshooting when pods aren't running properly.
 
-1. Create a VMware credentials secret:
+### Purpose
+
+- Check if the VMware guest that a Kubernetes node is running on is operational
+- Verify if the ESXi host running the guest has any errors
+- Monitor datastores assigned to VMs for events, alerts, and capacity issues
+- Correlate pod failures with potential underlying VMware infrastructure issues
+
+### VMware System Requirements
+
+- VMware vCenter Server or ESXi host
+- User account with read permissions to VMs, hosts, and datastores
+- Network connectivity from the Kubernetes cluster to the VMware environment
+
+### Configuration
+
+1. Create a Kubernetes Secret with VMware credentials:
 
    ```bash
-   # Create a .env.secret file with your VMware credentials
-   echo "host=vcenter.example.com" > .env.secret
-   echo "username=your-username" >> .env.secret
-   echo "password=your-password" >> .env.secret
-   
-   # Apply the secret using kustomize
-   kubectl apply -k deployments/monitoring/pod_monitor
+   kubectl create secret generic vmware-credentials \
+     --from-literal=username=your-vmware-username \
+     --from-literal=password=your-vmware-password \
+     -n monitoring
    ```
 
-2. Verify VMware connectivity:
+2. Update the Pod Monitor ConfigMap with VMware connection details:
 
    ```bash
-   # Run the pod monitor with VMware integration enabled
-   podman run -it --rm \
-     -e KUBECONFIG=/tmp/kubeconfig \
-     -e POD_MONITOR_VMWARE_HOST=vcenter.example.com \
-     -e POD_MONITOR_VMWARE_USERNAME=your-username \
-     -e POD_MONITOR_VMWARE_PASSWORD=your-password \
-     -v ~/.kube/config:/tmp/kubeconfig:ro \
-     k8s-playground/pod-monitor:latest monitor --log-level DEBUG
+   kubectl apply -f - <<EOF
+   apiVersion: v1
+   kind: ConfigMap
+   metadata:
+     name: pod-monitor-config
+     namespace: monitoring
+   data:
+     vmware.host: "vcenter.example.com"
+     vmware.port: "443"
+     vmware.disable_ssl_verification: "true"  # Set to false in production
+     vmware.datastore.low_space_threshold: "10"  # Alert when less than 10% free space
+   EOF
+   ```
+
+3. Ensure your Kubernetes nodes are properly labeled with their corresponding VMware VM names:
+
+   ```bash
+   # Example: Label a node with its VMware VM name
+   kubectl label node worker-1 vm-name=worker-1-vm
+   ```
+
+### VMware Verification
+
+To verify that the VMware integration is working:
+
+1. Check the Pod Monitor logs for successful VMware connections:
+
+   ```bash
+   kubectl logs -f deployment/pod-monitor -n monitoring | grep VMware
+   ```
+
+2. Intentionally power off a VMware VM that hosts a Kubernetes node and verify that the Pod Monitor detects this:
+
+   ```bash
+   kubectl get nodes  # Check that the node is NotReady
+   kubectl logs deployment/pod-monitor -n monitoring | grep "VMware machine"  # Should show alerts
+   ```
+
+3. Check for datastore monitoring:
+
+   ```bash
+   # View datastore-related alerts
+   kubectl logs deployment/pod-monitor -n monitoring | grep "Datastore"
    ```
 
 ## Prometheus Integration

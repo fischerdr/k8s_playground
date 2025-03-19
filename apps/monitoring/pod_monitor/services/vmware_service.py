@@ -7,7 +7,6 @@ import logging
 import ssl
 from typing import Dict, List, Optional
 
-import requests
 from pyVim import connect
 from pyVmomi import vim
 
@@ -198,18 +197,130 @@ class VMwareMonitorService:
                     f"VMware machine {vm.name} (node {vm.node_name}) is in {vm.status} state"
                 )
 
+                # Check ESXi host status when VM is problematic
+                host_status = self._check_esxi_host_status(vm.name)
+                if host_status:
+                    alerts.append(
+                        f"ESXi host for problematic VM {vm.name} (node {vm.node_name}) "
+                        f"has status: {host_status}"
+                    )
+
+                # Check datastore status when VM is problematic
+                datastore_alerts = self._check_datastore_status(vm.name)
+                alerts.extend(datastore_alerts)
+
             # Check for resource issues
             if vm.cpu_percent and vm.cpu_percent > 90:
                 alerts.append(
-                    f"VMware machine {vm.name} (node {vm.node_name}) has high CPU usage: {vm.cpu_percent:.1f}%"
+                    f"VMware machine {vm.name} (node {vm.node_name}) has high CPU usage: "
+                    f"{vm.cpu_percent:.1f}%"
                 )
 
             if vm.memory_percent and vm.memory_percent > 90:
                 alerts.append(
-                    f"VMware machine {vm.name} (node {vm.node_name}) has high memory usage: {vm.memory_percent:.1f}%"
+                    f"VMware machine {vm.name} (node {vm.node_name}) has high memory usage: "
+                    f"{vm.memory_percent:.1f}%"
                 )
 
         return alerts
+
+    def _check_esxi_host_status(self, vm_name: str) -> Optional[str]:
+        """Check the status of the ESXi host running a VM.
+
+        Args:
+            vm_name: Name of the VM
+
+        Returns:
+            Host status string (green, yellow, red) or None if not available
+        """
+        try:
+            vm = self._get_vm_by_name(vm_name)
+            if not vm or not vm.runtime.host:
+                return None
+
+            host = vm.runtime.host
+
+            # Check overall host status
+            overall_status = host.overallStatus
+
+            # Check for specific alarms on the host
+            alarms = host.triggeredAlarmState
+            if alarms:
+                for alarm in alarms:
+                    log.warning(f"ESXi host {host.name} has alarm: {alarm.alarm.info.name}")
+
+            # Check host hardware status
+            hardware_status = None
+            if hasattr(host, "hardware") and hasattr(host.hardware, "status"):
+                hardware_status = host.hardware.status.overallStatus
+
+            # Return the most severe status
+            if overall_status == "red" or hardware_status == "red":
+                return "red"
+            elif overall_status == "yellow" or hardware_status == "yellow":
+                return "yellow"
+            else:
+                return "green"
+
+        except Exception as e:
+            log.error(f"Error checking ESXi host status for VM {vm_name}: {e}")
+            return None
+
+    def _check_datastore_status(self, vm_name: str) -> List[str]:
+        """Check the status of datastores assigned to a VM.
+
+        Args:
+            vm_name: Name of the VM
+
+        Returns:
+            List of alert messages for problematic datastores
+        """
+        alerts = []
+        try:
+            vm = self._get_vm_by_name(vm_name)
+            if not vm:
+                return alerts
+
+            # Get all datastores used by this VM
+            datastores = vm.datastore
+            if not datastores:
+                return alerts
+
+            for ds in datastores:
+                # Check datastore overall status
+                if ds.overallStatus != "green":
+                    alerts.append(
+                        f"Datastore {ds.name} for VM {vm_name} has status: {ds.overallStatus}"
+                    )
+
+                # Check datastore alarms
+                if hasattr(ds, "triggeredAlarmState") and ds.triggeredAlarmState:
+                    for alarm in ds.triggeredAlarmState:
+                        alerts.append(
+                            f"Datastore {ds.name} for VM {vm_name} has alarm: "
+                            f"{alarm.alarm.info.name}"
+                        )
+
+                # Check datastore capacity
+                if (
+                    hasattr(ds, "summary")
+                    and hasattr(ds.summary, "capacity")
+                    and hasattr(ds.summary, "freeSpace")
+                ):
+                    capacity = ds.summary.capacity
+                    free_space = ds.summary.freeSpace
+                    if capacity > 0:
+                        free_percent = (free_space / capacity) * 100
+                        if free_percent < 10:
+                            alerts.append(
+                                f"Datastore {ds.name} for VM {vm_name} is low on space: "
+                                f"{free_percent:.1f}% free"
+                            )
+
+            return alerts
+        except Exception as e:
+            log.error(f"Error checking datastore status for VM {vm_name}: {e}")
+            return alerts
 
     def _get_vm_status(self, vm: vim.VirtualMachine) -> str:
         """Get the status of a VM.

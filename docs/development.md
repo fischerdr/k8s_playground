@@ -5,7 +5,7 @@ This document outlines the development practices for the Kubernetes Playground p
 ## Code Style
 
 - Follow PEP8 style guide for Python code
-- Use Black for code formatting with a line length of 88 characters
+- Use Black for code formatting with a line length of 100 characters
 - Use isort for import sorting
 - Use flake8 for code linting
 - Use type hints consistently throughout the codebase
@@ -95,17 +95,30 @@ When developing monitoring applications:
 
 When working with VMware integration:
 
-1. **Connection Management**:
+1. **Purpose and Scope**:
+   - The primary purpose is to check if the VMware guest that a Kubernetes node is running on is operational
+   - Verify if the ESXi host running the guest has any errors
+   - Check datastores assigned to VMs for events, alerts, and capacity issues
+   - These checks are particularly important when troubleshooting non-running pods
+   - Focus on correlation between pod failures and underlying VMware infrastructure issues
+
+2. **Connection Management**:
    - Implement connection pooling to minimize connection overhead
    - Handle connection failures gracefully
    - Implement proper authentication
 
-2. **VM Correlation**:
+3. **VM Correlation**:
    - Establish reliable mapping between Kubernetes nodes and VMware VMs
    - Handle cases where correlation is not possible
    - Document correlation methods
 
-3. **Security Considerations**:
+4. **Datastore Monitoring**:
+   - Check datastore health and status when VMs are in problematic states
+   - Monitor datastore capacity and alert on low free space
+   - Track datastore-related events and alarms
+   - Correlate datastore issues with VM and pod failures
+
+5. **Security Considerations**:
    - Never hardcode VMware credentials
    - Use Kubernetes Secrets for credential storage
    - Implement proper error handling for authentication failures

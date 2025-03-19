@@ -1,6 +1,12 @@
 [flake8]
 max-line-length = 100
-extend-ignore = E203, W503
+extend-ignore = 
+    # Allow spaces after operator
+    E203, 
+    # Allow line continuation with backslash
+    W503,
+    # Long lines are allowed for long strings
+    E501
 exclude = 
     .git,
     __pycache__,
