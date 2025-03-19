@@ -10,6 +10,8 @@ Welcome to the Kubernetes Playground documentation. This index provides an overv
 - [Project Organization](project_organization.md)
 - [Development Guidelines](development.md)
 - [Deployment Guide](deployment.md)
+- [VMware Integration Guide](vmware_integration.md)
+- [Security Guide](security.md)
 
 ## Last Updated
 
@@ -28,6 +30,7 @@ The Kubernetes Playground project documentation is organized into the following 
 | [Project Organization](project_organization.md) | Overview of the project structure and organization |
 | [Development Guidelines](development.md) | Development practices, code style, and best practices |
 | [Deployment Guide](deployment.md) | Detailed instructions for deploying components to Kubernetes |
+| [Security Guide](security.md) | Security best practices, RBAC configuration, and network policies |
 
 ### Application-Specific Documentation
 

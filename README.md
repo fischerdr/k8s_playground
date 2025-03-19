@@ -130,12 +130,15 @@ To monitor only specific namespaces with critical applications:
 
 ## Documentation
 
-Detailed documentation is available in the `docs/` directory:
+Comprehensive documentation is available in the [docs](docs/) directory:
 
-- [Setup Guide](docs/setup.md) - Instructions for setting up the project environment
-- [Project Organization](docs/project_organization.md) - Overview of the project structure and organization
+- [Documentation Index](docs/index.md) - Overview of all available documentation
+- [Setup Guide](docs/setup.md) - Instructions for setting up the project
+- [Deployment Guide](docs/deployment.md) - Instructions for deploying components
+- [Project Organization](docs/project_organization.md) - Project structure and organization
 - [Development Guidelines](docs/development.md) - Development practices and guidelines
-- [Deployment Guide](docs/deployment.md) - Detailed deployment instructions
+- [VMware Integration Guide](docs/vmware_integration.md) - VMware integration features
+- [Security Guide](docs/security.md) - Security best practices and RBAC configuration
 
 Each documentation file includes navigation links to help you move between related topics. For application-specific documentation, see the README files in the respective application directories:
 
