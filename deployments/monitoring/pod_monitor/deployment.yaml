@@ -77,6 +77,16 @@ spec:
             configMapKeyRef:
               name: pod-monitor-config
               key: pod_problematic_threshold
+        - name: POD_MONITOR_POD_LABEL_SELECTORS
+          valueFrom:
+            configMapKeyRef:
+              name: pod-monitor-config
+              key: pod_label_selectors
+        - name: POD_MONITOR_MONITOR_ALL_NODES
+          valueFrom:
+            configMapKeyRef:
+              name: pod-monitor-config
+              key: monitor_all_nodes
         - name: POD_MONITOR_VMWARE_HOST
           valueFrom:
             secretKeyRef:

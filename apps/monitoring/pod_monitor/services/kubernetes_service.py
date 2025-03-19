@@ -4,8 +4,7 @@ This module provides services for monitoring Kubernetes pods and nodes.
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from kubernetes import client, config, watch
 from kubernetes.client.exceptions import ApiException
@@ -50,19 +49,20 @@ class KubernetesMonitorService:
             log.error(f"Failed to initialize Kubernetes client: {e}")
             raise
 
-    def get_pods(self, namespace: str) -> List[PodMetric]:
-        """Get metrics for pods in the specified namespace.
+    def get_pods(self, namespace: str, label_selector: Optional[str] = None) -> List[PodMetric]:
+        """Get pods in a namespace.
 
         Args:
             namespace: Namespace to get pods from
+            label_selector: Label selector to filter pods (e.g. "app=nginx,environment=prod")
 
         Returns:
             List of PodMetric objects
         """
-        log.info(f"Getting pods in namespace {namespace}")
+        log.info(f"Getting pods in namespace {namespace}{' with label selector: ' + label_selector if label_selector else ''}")
 
         try:
-            pods = self.core_api.list_namespaced_pod(namespace).items
+            pods = self.core_api.list_namespaced_pod(namespace, label_selector=label_selector).items
             pod_metrics = []
 
             for pod in pods:
@@ -163,6 +163,9 @@ class KubernetesMonitorService:
                     vmware_machine_name = labels.get("vm-name")
                 elif labels.get("vsphere-vm-name"):
                     vmware_machine_name = labels.get("vsphere-vm-name")
+                else:
+                    # If no label is present, use the node name as the VMware guest name
+                    vmware_machine_name = node_name
 
                 node_metric = NodeMetric(
                     name=node_name,
@@ -182,6 +185,65 @@ class KubernetesMonitorService:
         except Exception as e:
             log.error(f"Error getting nodes: {e}")
             raise
+
+    def get_all_nodes(self) -> List[NodeMetric]:
+        """Get all nodes in the cluster.
+
+        Returns:
+            List of NodeMetric objects
+        """
+        log.info("Getting all nodes in the cluster")
+
+        try:
+            nodes = self.core_api.list_node().items
+            node_metrics = []
+
+            for node in nodes:
+                node_name = node.metadata.name
+                node_status = self._get_node_status(node)
+
+                # Get node labels
+                labels = {}
+                if node.metadata.labels:
+                    labels = node.metadata.labels
+
+                # Get VMware machine name from labels
+                vmware_machine_name = None
+                if "vm-name" in labels:
+                    vmware_machine_name = labels["vm-name"]
+                elif "vsphere-vm-name" in labels:
+                    vmware_machine_name = labels["vsphere-vm-name"]
+                else:
+                    # Use node name as VM name if no label is present
+                    vmware_machine_name = node_name
+
+                # Parse creation timestamp
+                creation_time = None
+                if node.metadata.creation_timestamp:
+                    creation_time = node.metadata.creation_timestamp.replace(tzinfo=None)
+
+                # Get node conditions
+                conditions = {}
+                if node.status.conditions:
+                    for condition in node.status.conditions:
+                        conditions[condition.type] = condition.status == "True"
+
+                node_metric = NodeMetric(
+                    name=node_name,
+                    status=node_status,
+                    creation_time=creation_time,
+                    conditions=conditions,
+                    labels=labels,
+                    vmware_machine_name=vmware_machine_name,
+                )
+
+                node_metrics.append(node_metric)
+
+            return node_metrics
+
+        except Exception as e:
+            log.error(f"Error getting all nodes: {e}")
+            return []
 
     def watch_pods(self, namespace: str, timeout_seconds: int = 60) -> List[Tuple[str, PodMetric]]:
         """Watch pods in the specified namespace for changes.

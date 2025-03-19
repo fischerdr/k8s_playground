@@ -51,8 +51,7 @@ This document provides instructions for setting up the Kubernetes Playground pro
 
    ```bash
    kubectl create namespace monitoring
-   kubectl create namespace namespace-ops
-   kubectl create namespace vmware-integration
+
    ```
 
 3. Set up RBAC permissions for monitoring applications:
@@ -128,15 +127,39 @@ The VMware integration allows our monitoring applications to check the status of
      vmware.port: "443"
      vmware.disable_ssl_verification: "true"  # Set to false in production
      vmware.datastore.low_space_threshold: "10"  # Alert when less than 10% free space
+     
+     # Targeted monitoring configuration
+     pod_label_selectors: "app=critical,tier=production"  # Only monitor pods with these labels
+     monitor_all_nodes: "false"  # Set to true to monitor all nodes regardless of pod selection
    EOF
    ```
 
-3. Ensure your Kubernetes nodes are properly labeled with their corresponding VMware VM names:
+3. Kubernetes nodes can be labeled with their corresponding VMware VM names:
 
    ```bash
    # Example: Label a node with its VMware VM name
    kubectl label node worker-1 vm-name=worker-1-vm
    ```
+
+   > **Note:** If the `vm-name` label is not present, the system will use the node name as the VMware guest name.
+
+### Targeted Monitoring
+
+To optimize vCenter performance in large clusters, the Pod Monitor supports targeted monitoring:
+
+1. **Pod Label Selectors**: Only monitor pods (and their nodes) that match specific labels
+   - Configure with comma-separated key=value pairs (e.g., `app=critical,tier=production`)
+   - This significantly reduces the number of VMware API calls in large clusters
+
+2. **Selective Node Monitoring**: By default, only nodes running the selected pods will be monitored
+   - This prevents unnecessary VMware API calls for nodes not running critical workloads
+   - Set `monitor_all_nodes: "true"` to monitor all nodes regardless of pod selection
+
+3. **Environment Variables**: You can also configure these options via environment variables:
+   - `POD_MONITOR_POD_LABEL_SELECTORS=app=critical,tier=production`
+   - `POD_MONITOR_MONITOR_ALL_NODES=false`
+
+This targeted approach is especially beneficial in large clusters with hundreds of nodes, as it minimizes the impact on your vCenter Server while still providing critical monitoring for your most important workloads.
 
 ### VMware Verification
 

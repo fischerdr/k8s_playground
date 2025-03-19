@@ -8,15 +8,11 @@ This document outlines the organization and structure of the Kubernetes Playgrou
   - **monitoring/**: Applications for monitoring Kubernetes resources
     - **cluster_monitor/**: Monitors overall Kubernetes cluster health
     - **pod_monitor/**: Monitors pod states, node status, and VMware integration
-  - **namespace_ops/**: Applications for cross-namespace operations
-  - **vmware_integration/**: Applications for VMware integration
 
 - **deployments/**: Contains Kubernetes manifests for deploying applications
   - **monitoring/**: YAML files for monitoring applications
     - **cluster_monitor/**: Deployment manifests for cluster monitor
     - **pod_monitor/**: Deployment manifests for pod monitor
-  - **namespace_ops/**: YAML files for namespace operations applications
-  - **vmware_integration/**: YAML files for VMware integration applications
 
 - **docs/**: Project documentation
   - **setup.md**: Setup instructions

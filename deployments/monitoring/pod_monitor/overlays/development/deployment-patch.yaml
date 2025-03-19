@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-monitor
+spec:
+  replicas: 1  # Single replica for development
+  template:
+    spec:
+      containers:
+      - name: pod-monitor
+        resources:
+          limits:
+            cpu: "300m"  # Lower CPU limit for development
+            memory: "384Mi"  # Lower memory limit for development
+          requests:
+            cpu: "100m"  # Lower CPU request for development
+            memory: "128Mi"  # Lower memory request for development

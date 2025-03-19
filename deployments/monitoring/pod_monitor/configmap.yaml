@@ -15,6 +15,12 @@ data:
       - monitoring
       - kube-system
     
+    # Pod selection configuration
+    pod_label_selectors:
+      app: critical
+      tier: production
+    monitor_all_nodes: false  # Set to true to monitor all nodes regardless of pod selection
+    
     # Monitoring configuration
     pod_problematic_threshold: 300  # 5 minutes in seconds
     monitoring_interval: 60  # 1 minute in seconds
@@ -42,3 +48,5 @@ data:
   prometheus_port: "9090"
   rate_limit_api_calls: "true"
   rate_limit_interval: "5"
+  pod_label_selectors: "app=critical,tier=production"
+  monitor_all_nodes: "false"

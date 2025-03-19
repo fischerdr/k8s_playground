@@ -8,13 +8,12 @@ import logging
 import signal
 import sys
 import time
-from typing import Dict, List, Optional
+from typing import Optional
 
 import typer
 from rich.console import Console
 from rich.logging import RichHandler
 
-from .models.metrics import NodeMetric, PodMetric, VMwareMetric
 from .services.kubernetes_service import KubernetesMonitorService
 from .services.prometheus_service import PrometheusService
 from .services.vmware_service import VMwareMonitorService
@@ -141,17 +140,23 @@ def monitor_iteration(config: Config) -> None:
     try:
         # Collect pod metrics for all configured namespaces
         all_pod_metrics = []
-        all_node_names = set()
+        monitored_node_names = set()  # Only track nodes running pods that match our criteria
+
+        # Create label selector string from config if provided
+        label_selector = None
+        if config.pod_label_selectors:
+            label_selector = ",".join([f"{k}={v}" for k, v in config.pod_label_selectors.items()])
+            log.info(f"Using label selector: {label_selector}")
 
         for namespace in config.namespaces:
             try:
-                pod_metrics = kubernetes_service.get_pods(namespace)
+                pod_metrics = kubernetes_service.get_pods(namespace, label_selector=label_selector)
                 all_pod_metrics.extend(pod_metrics)
 
-                # Collect node names from pods
+                # Collect node names only from pods that match our criteria
                 for pod in pod_metrics:
                     if pod.node_name:
-                        all_node_names.add(pod.node_name)
+                        monitored_node_names.add(pod.node_name)
 
                 # Check for pod alerts
                 pod_alerts = kubernetes_service.check_pod_alerts(pod_metrics)
@@ -165,45 +170,58 @@ def monitor_iteration(config: Config) -> None:
             except Exception as e:
                 log.error(f"Error monitoring namespace {namespace}: {e}")
 
-        # Collect node metrics
-        node_metrics = kubernetes_service.get_nodes(list(all_node_names))
+        # If configured to monitor all nodes, get all nodes in the cluster
+        node_names_to_monitor = list(monitored_node_names)
+        if config.monitor_all_nodes:
+            log.info("Configured to monitor all nodes in the cluster")
+            # Get all nodes in the cluster
+            all_nodes = kubernetes_service.get_all_nodes()
+            node_names_to_monitor = [node.name for node in all_nodes]
+        else:
+            log.info(f"Monitoring only nodes running selected pods: {node_names_to_monitor}")
 
-        # Check for node alerts
-        node_alerts = kubernetes_service.check_node_alerts(node_metrics)
-        for alert in node_alerts:
-            log.warning(f"Node Alert: {alert}")
-            prometheus_service.record_alert("status", "node")
+        # Collect node metrics only for nodes we're monitoring
+        if node_names_to_monitor:
+            node_metrics = kubernetes_service.get_nodes(node_names_to_monitor)
 
-        # Update Prometheus metrics for nodes
-        prometheus_service.update_node_metrics(node_metrics)
+            # Check for node alerts
+            node_alerts = kubernetes_service.check_node_alerts(node_metrics)
+            for alert in node_alerts:
+                log.warning(f"Node Alert: {alert}")
+                prometheus_service.record_alert("status", "node")
 
-        # Collect VMware metrics if VMware service is configured
-        if vmware_service:
-            # Get VMware machine names from node metrics
-            vm_names = []
-            node_names = []
+            # Update Prometheus metrics for nodes
+            prometheus_service.update_node_metrics(node_metrics)
 
-            for node in node_metrics:
-                if node.vmware_machine_name:
-                    vm_names.append(node.vmware_machine_name)
-                    node_names.append(node.name)
+            # Collect VMware metrics if VMware service is configured
+            if vmware_service:
+                # Get VMware machine names from node metrics
+                vm_names = []
+                node_names = []
 
-            if vm_names:
-                try:
-                    # Get VMware metrics
-                    vmware_metrics = vmware_service.get_vm_metrics(vm_names, node_names)
+                for node in node_metrics:
+                    if node.vmware_machine_name:
+                        vm_names.append(node.vmware_machine_name)
+                        node_names.append(node.name)
 
-                    # Check for VMware alerts
-                    vm_alerts = vmware_service.check_vm_alerts(vmware_metrics)
-                    for alert in vm_alerts:
-                        log.warning(f"VMware Alert: {alert}")
-                        prometheus_service.record_alert("status", "vmware")
+                if vm_names:
+                    try:
+                        # Get VMware metrics
+                        vmware_metrics = vmware_service.get_vm_metrics(vm_names, node_names)
 
-                    # Update Prometheus metrics for VMware machines
-                    prometheus_service.update_vmware_metrics(vmware_metrics)
+                        # Check for VMware alerts
+                        vm_alerts = vmware_service.check_vm_alerts(vmware_metrics)
+                        for alert in vm_alerts:
+                            log.warning(f"VMware Alert: {alert}")
+                            prometheus_service.record_alert("status", "vmware")
 
-                except Exception as e:
-                    log.error(f"Error monitoring VMware machines: {e}")
+                        # Update Prometheus metrics for VMware machines
+                        prometheus_service.update_vmware_metrics(vmware_metrics)
+
+                    except Exception as e:
+                        log.error(f"Error monitoring VMware machines: {e}")
+        else:
+            log.info("No nodes to monitor based on current configuration")
 
     except Exception as e:
         log.error(f"Error in monitoring iteration: {e}", exc_info=True)

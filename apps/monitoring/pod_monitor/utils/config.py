@@ -33,6 +33,10 @@ class Config:
     kubeconfig_path: Optional[str] = None
     namespaces: List[str] = field(default_factory=lambda: ["default"])
 
+    # Pod selection configuration
+    pod_label_selectors: Dict[str, str] = field(default_factory=dict)
+    monitor_all_nodes: bool = False  # If False, only monitor nodes running selected pods
+
     # Monitoring configuration
     pod_problematic_threshold: int = 300  # 5 minutes in seconds
     monitoring_interval: int = 60  # 1 minute in seconds
@@ -78,6 +82,8 @@ class Config:
         return cls(
             kubeconfig_path=config_dict.get("kubeconfig_path"),
             namespaces=config_dict.get("namespaces", ["default"]),
+            pod_label_selectors=config_dict.get("pod_label_selectors", {}),
+            monitor_all_nodes=config_dict.get("monitor_all_nodes", False),
             pod_problematic_threshold=config_dict.get("pod_problematic_threshold", 300),
             monitoring_interval=config_dict.get("monitoring_interval", 60),
             vmware=vmware_config,
@@ -186,6 +192,22 @@ def load_config(config_path: Optional[str] = None) -> Config:
 
     if vmware_config:
         config_data["vmware"] = vmware_config
+
+    # Handle pod label selectors
+    pod_label_selectors_env = f"{env_prefix}POD_LABEL_SELECTORS"
+    if pod_label_selectors_env in os.environ:
+        config_data["pod_label_selectors"] = dict(
+            pair.split("=") for pair in os.environ[pod_label_selectors_env].split(",")
+        )
+
+    # Handle monitor all nodes
+    monitor_all_nodes_env = f"{env_prefix}MONITOR_ALL_NODES"
+    if monitor_all_nodes_env in os.environ:
+        config_data["monitor_all_nodes"] = os.environ[monitor_all_nodes_env].lower() in [
+            "true",
+            "1",
+            "yes",
+        ]
 
     # Create config object
     config = Config.from_dict(config_data)

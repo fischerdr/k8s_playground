@@ -20,6 +20,8 @@ configMapGenerator:
     literals:
       - monitoring_interval=60
       - log_level=INFO
+      - pod_label_selectors=app=critical,tier=production
+      - monitor_all_nodes=false
 
 secretGenerator:
   - name: pod-monitor-vmware-credentials

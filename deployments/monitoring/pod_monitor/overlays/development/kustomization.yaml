@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../  # Reference the base configuration
+
+namespace: monitoring
+
+# Development-specific configuration
+configMapGenerator:
+  - name: pod-monitor-config
+    behavior: merge
+    literals:
+      - monitoring_interval=120  # Less frequent monitoring in development
+      - log_level=DEBUG  # More verbose logging for development
+      - monitor_all_nodes=true  # Monitor all nodes in development
+      - pod_label_selectors=  # No label filtering in development
+
+patchesStrategicMerge:
+  - deployment-patch.yaml
+
+images:
+  - name: k8s-playground/pod-monitor
+    newTag: latest  # Use latest tag for development
