@@ -59,7 +59,9 @@ class KubernetesMonitorService:
         Returns:
             List of PodMetric objects
         """
-        log.info(f"Getting pods in namespace {namespace}{' with label selector: ' + label_selector if label_selector else ''}")
+        log.info(
+            f"Getting pods in namespace {namespace}{' with label selector: ' + label_selector if label_selector else ''}"
+        )
 
         try:
             pods = self.core_api.list_namespaced_pod(namespace, label_selector=label_selector).items
