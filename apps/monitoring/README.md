@@ -2,6 +2,27 @@
 
 This directory contains applications for monitoring Kubernetes clusters and workloads.
 
+## Navigation
+
+- [Main README](../../README.md)
+- [Setup Guide](../../docs/setup.md)
+- [Project Organization](../../docs/project_organization.md)
+- [Development Guidelines](../../docs/development.md)
+- [Deployment Guide](../../docs/deployment.md)
+
+## Table of Contents
+
+- [Applications](#applications)
+- [VMware Monitoring](#vmware-monitoring)
+  - [Key Features](#key-features)
+  - [When Monitoring Occurs](#when-monitoring-occurs)
+- [Development](#development)
+- [Deployment](#deployment)
+
+## Last Updated
+
+March 19, 2025
+
 ## Applications
 
 - **cluster_monitor**: Monitors overall Kubernetes cluster resources and health, exposing metrics to Prometheus for alerting and visualization.
@@ -14,7 +35,7 @@ This directory contains applications for monitoring Kubernetes clusters and work
   - Datastore status and capacity monitoring
   - Prometheus metrics exposure
 
-## VMware Integration
+## VMware Monitoring
 
 The pod_monitor application includes robust VMware infrastructure monitoring capabilities:
 
@@ -41,9 +62,9 @@ This focused approach ensures that VMware monitoring is performed specifically w
 
 Follow the project development guidelines in the `docs/` directory, particularly:
 
-- `docs/development.md` for development practices
-- `docs/setup.md` for configuration and deployment instructions
+- [Development Guidelines](../../docs/development.md) for development practices
+- [Setup Guide](../../docs/setup.md) for configuration and deployment instructions
 
 ## Deployment
 
-Deployment manifests for these applications can be found in the `deployments/monitoring/` directory.
+Deployment manifests for these applications can be found in the `deployments/monitoring/` directory. For detailed deployment instructions, see the [Deployment Guide](../../docs/deployment.md).

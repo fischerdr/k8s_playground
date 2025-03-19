@@ -2,292 +2,227 @@
 
 This document provides detailed instructions for deploying the Kubernetes Playground components to a Kubernetes cluster, with a focus on the monitoring applications.
 
+## Navigation
+
+- [Main README](../README.md)
+- [Documentation Index](index.md)
+- [Setup Guide](setup.md)
+- [Project Organization](project_organization.md)
+- [Development Guidelines](development.md)
+- **Deployment Guide** (You are here)
+- [VMware Integration Guide](vmware_integration.md)
+
 ## Table of Contents
 
-- [Deployment Guide for Kubernetes Playground](#deployment-guide-for-kubernetes-playground)
-  - [Table of Contents](#table-of-contents)
-  - [Prerequisites](#prerequisites)
-  - [Deployment Overview](#deployment-overview)
-  - [Pod Monitor Deployment](#pod-monitor-deployment)
-    - [Building the Image](#building-the-image)
-    - [Deployment Steps](#deployment-steps)
-    - [Configuration Options](#configuration-options)
-      - [Kubernetes Configuration](#kubernetes-configuration)
-      - [Pod Selection Configuration](#pod-selection-configuration)
-      - [Monitoring Configuration](#monitoring-configuration)
-      - [VMware Configuration](#vmware-configuration)
-    - [Targeted Monitoring Setup](#targeted-monitoring-setup)
-      - [1. Using ConfigMap](#1-using-configmap)
-      - [2. Using Environment Variables](#2-using-environment-variables)
-    - [VMware Integration](#vmware-integration)
-    - [Production-Ready Features](#production-ready-features)
-      - [High Availability](#high-availability)
-      - [Security](#security)
-      - [Observability](#observability)
-      - [Resource Management](#resource-management)
-  - [Cluster Monitor Deployment](#cluster-monitor-deployment)
-  - [Troubleshooting](#troubleshooting)
-    - [Common Issues](#common-issues)
-    - [Logs and Debugging](#logs-and-debugging)
+- [Prerequisites](#prerequisites)
+- [Deployment Overview](#deployment-overview)
+- [Pod Monitor Deployment](#pod-monitor-deployment)
+  - [Building the Image](#building-the-image)
+  - [Deployment Steps](#deployment-steps)
+  - [Configuration Options](#configuration-options)
+    - [Kubernetes Configuration](#kubernetes-configuration)
+    - [Pod Selection Configuration](#pod-selection-configuration)
+    - [Monitoring Configuration](#monitoring-configuration)
+- [Cluster Monitor Deployment](#cluster-monitor-deployment)
+- [Prometheus Integration](#prometheus-integration)
+- [Troubleshooting](#troubleshooting)
+  - [Common Issues](#common-issues)
+  - [Logs and Debugging](#logs-and-debugging)
+
+## Last Updated
+
+March 19, 2025
 
 ## Prerequisites
 
 Before deploying the Kubernetes Playground components, ensure you have:
 
-- A running Kubernetes cluster (v1.19+)
-- `kubectl` CLI tool configured to access your cluster
-- Necessary RBAC permissions to create resources in the target namespaces
-- Docker or Podman for building container images (if deploying from source)
-- For VMware integration: Access to a VMware vCenter Server or ESXi host
+- Completed the [Setup Guide](setup.md)
+- Access to a Kubernetes cluster with appropriate permissions
+- kubectl CLI tool configured to access your cluster
+- Docker/Podman for building container images (if deploying custom builds)
 
 ## Deployment Overview
 
-The Kubernetes Playground project consists of several components that can be deployed independently:
+The Kubernetes Playground project includes several deployable components:
 
 1. **Pod Monitor**: Monitors pod states in specific namespaces
-2. **Cluster Monitor**: Monitors overall Kubernetes cluster health
-3. **Namespace Operations**: Tools for cross-namespace operations
+2. **Cluster Monitor**: Monitors overall cluster health
+3. **VMware Integration**: Optional component for monitoring VMware infrastructure
 
-Each component has its own deployment configuration in the `deployments/` directory.
+Each component can be deployed independently or together, depending on your monitoring needs.
 
 ## Pod Monitor Deployment
 
-The Pod Monitor is a critical component that monitors pod states in specific namespaces and can integrate with VMware infrastructure to provide comprehensive monitoring.
-
 ### Building the Image
 
-If you need to build the Pod Monitor image locally:
+1. Build the Pod Monitor image:
 
-```bash
-# From the project root
-cd apps/monitoring/pod_monitor
-docker build -t k8s-playground/pod-monitor:latest .
-```
+   ```bash
+   podman build -t k8s-playground/pod-monitor:latest ./apps/monitoring/pod_monitor
+   ```
+
+2. Push the image to your registry (if needed):
+
+   ```bash
+   podman push k8s-playground/pod-monitor:latest your-registry/k8s-playground/pod-monitor:latest
+   ```
 
 ### Deployment Steps
 
-1. Create the monitoring namespace (if it doesn't exist):
+1. Create the necessary RBAC resources:
 
-    ```bash
-    kubectl create namespace monitoring
-    ```
+   ```bash
+   kubectl apply -f deployments/monitoring/pod_monitor/rbac.yaml
+   ```
 
-2. Deploy the RBAC resources:
+2. Create a ConfigMap for Pod Monitor configuration:
 
-    ```bash
-    kubectl apply -f deployments/monitoring/pod_monitor/rbac.yaml
-    ```
+   ```bash
+   kubectl apply -f deployments/monitoring/pod_monitor/configmap.yaml
+   ```
 
-3. Create the ConfigMap with your desired configuration:
+3. Deploy the Pod Monitor:
 
-    ```bash
-    kubectl apply -f deployments/monitoring/pod_monitor/configmap.yaml
-    ```
+   ```bash
+   kubectl apply -f deployments/monitoring/pod_monitor/deployment.yaml
+   ```
 
-4. If using VMware integration, create the secrets:
+4. Verify the deployment:
 
-    ```bash
-    kubectl create secret generic pod-monitor-vmware-credentials \
-    --from-literal=host=vcenter.example.com \
-    --from-literal=username=your-vmware-username \
-    --from-literal=password=your-vmware-password \
-    -n monitoring
-    ```
-
-5. Deploy the Pod Monitor:
-
-    ```bash
-    kubectl apply -f deployments/monitoring/pod_monitor/deployment.yaml
-    ```
-
-6. Deploy the service (for Prometheus metrics):
-
-    ```bash
-    kubectl apply -f deployments/monitoring/pod_monitor/service.yaml
-    ```
-
-7. Deploy the PodDisruptionBudget for high availability:
-
-    ```bash
-    kubectl apply -f deployments/monitoring/pod_monitor/pdb.yaml
-    ```
-
-8. Deploy the NetworkPolicy for enhanced security:
-
-    ```bash
-    kubectl apply -f deployments/monitoring/pod_monitor/network-policy.yaml
-    ```
-
-Alternatively, you can use Kustomize to deploy all resources at once:
-
-```bash
-# For production environment
-kubectl apply -k deployments/monitoring/pod_monitor/overlays/production
-
-# For development environment
-kubectl apply -k deployments/monitoring/pod_monitor/overlays/development
-```
+   ```bash
+   kubectl get pods -n monitoring -l app=pod-monitor
+   kubectl logs -n monitoring -l app=pod-monitor
+   ```
 
 ### Configuration Options
 
-The Pod Monitor can be configured through the ConfigMap. Here are the key configuration options:
+The Pod Monitor can be configured using a ConfigMap or environment variables.
 
 #### Kubernetes Configuration
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `namespaces` | List of namespaces to monitor | `["default"]` |
-| `kubeconfig_path` | Path to kubeconfig file (usually not needed in-cluster) | `None` |
+| Option | Description | Default | Environment Variable |
+|--------|-------------|---------|---------------------|
+| `namespaces` | Comma-separated list of namespaces to monitor | `default` | `POD_MONITOR_NAMESPACES` |
+| `kube_config_path` | Path to kubeconfig file | In-cluster config | `KUBECONFIG` |
+| `in_cluster` | Whether to use in-cluster config | `true` | `POD_MONITOR_IN_CLUSTER` |
 
 #### Pod Selection Configuration
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `pod_label_selectors` | Labels to filter which pods to monitor | `{}` |
-| `monitor_all_nodes` | Whether to monitor all nodes or only those running selected pods | `false` |
+| Option | Description | Default | Environment Variable |
+|--------|-------------|---------|---------------------|
+| `pod_label_selectors` | Labels to filter which pods to monitor | `""` | `POD_MONITOR_POD_LABEL_SELECTORS` |
+| `monitor_all_nodes` | Whether to monitor all nodes or only those running selected pods | `false` | `POD_MONITOR_MONITOR_ALL_NODES` |
 
 #### Monitoring Configuration
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `pod_problematic_threshold` | Time in seconds before a non-running pod is considered problematic | `300` |
-| `monitoring_interval` | Monitoring interval in seconds | `60` |
+| Option | Description | Default | Environment Variable |
+|--------|-------------|---------|---------------------|
+| `monitoring_interval` | Interval in seconds between monitoring iterations | `60` | `POD_MONITOR_INTERVAL` |
+| `pod_problematic_threshold` | Time in seconds before a non-Running pod is considered problematic | `300` | `POD_MONITOR_POD_PROBLEMATIC_THRESHOLD` |
+| `prometheus_port` | Port to expose Prometheus metrics on | `9090` | `POD_MONITOR_PROMETHEUS_PORT` |
+| `log_level` | Logging level (INFO, DEBUG, WARNING, ERROR) | `INFO` | `POD_MONITOR_LOG_LEVEL` |
 
-#### VMware Configuration
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `vmware.host` | VMware vCenter/ESXi host | Required if using VMware |
-| `vmware.username` | VMware username | Required if using VMware |
-| `vmware.password` | VMware password | Required if using VMware |
-| `vmware.port` | VMware API port | `443` |
-| `vmware.disable_ssl_verification` | Whether to disable SSL verification | `false` |
-
-### Targeted Monitoring Setup
-
-For large clusters with hundreds of nodes, it's recommended to use targeted monitoring to reduce the load on your VMware vCenter Server. This can be configured in two ways:
-
-#### 1. Using ConfigMap
-
-Edit the `configmap.yaml` file:
-
-```yaml
-data:
-  config.yaml: |
-    # Pod selection configuration
-    pod_label_selectors:
-      app: critical
-      tier: production
-    monitor_all_nodes: false
-```
-
-#### 2. Using Environment Variables
-
-You can also configure these options via environment variables in the deployment:
-
-```yaml
-env:
-- name: POD_MONITOR_POD_LABEL_SELECTORS
-  value: "app=critical,tier=production"
-- name: POD_MONITOR_MONITOR_ALL_NODES
-  value: "false"
-```
-
-### VMware Integration
-
-To enable VMware integration, you need to:
-
-1. Create a secret with VMware credentials:
-
-```bash
-kubectl create secret generic pod-monitor-vmware-credentials \
-  --from-literal=host=vcenter.example.com \
-  --from-literal=username=your-vmware-username \
-  --from-literal=password=your-vmware-password \
-  -n monitoring
-```
-
-1. Label your Kubernetes nodes with their corresponding VMware VM names:
-
-```bash
-kubectl label node worker-1 vm-name=worker-1-vm
-```
-
-Note: If the `vm-name` label is not present, the system will use the node name as the VMware guest name.
-
-### Production-Ready Features
-
-The Pod Monitor includes several production-ready features to ensure reliability, security, and observability:
-
-#### High Availability
-
-- **Replicas**: The production deployment uses 3 replicas for high availability
-- **Rolling Updates**: Configured with `maxSurge: 1` and `maxUnavailable: 0` for zero-downtime updates
-- **PodDisruptionBudget**: Ensures at least one pod is always available during voluntary disruptions
-- **Health Probes**: Includes liveness, readiness, and startup probes for better resilience
-
-#### Security
-
-- **RBAC**: Proper role-based access control with a dedicated ServiceAccount
-- **SecurityContext**: Runs as non-root user with minimal capabilities
-- **NetworkPolicy**: Restricts inbound and outbound traffic to only what's necessary
-- **Secrets Management**: Sensitive credentials stored in Kubernetes Secrets
-
-#### Observability
-
-- **Prometheus Integration**: Exposes metrics for Prometheus scraping
-- **Health Endpoints**: Provides `/health` endpoint for monitoring application health
-- **Logging**: Configurable log levels with structured logging
-
-#### Resource Management
-
-- **Resource Limits**: Properly defined CPU and memory limits and requests
-- **Environment-Specific Configurations**: Separate configurations for production and development
-- **Kustomize Overlays**: Easy customization for different environments
+For VMware-specific configuration options, see the [VMware Integration Guide](vmware_integration.md).
 
 ## Cluster Monitor Deployment
 
-The Cluster Monitor deployment follows a similar pattern to the Pod Monitor. Refer to the specific deployment files in `deployments/monitoring/cluster_monitor/` for details.
+1. Build the Cluster Monitor image:
+
+   ```bash
+   podman build -t k8s-playground/cluster-monitor:latest ./apps/monitoring/cluster_monitor
+   ```
+
+2. Create the necessary RBAC resources:
+
+   ```bash
+   kubectl apply -f deployments/monitoring/cluster_monitor/rbac.yaml
+   ```
+
+3. Create a ConfigMap for Cluster Monitor configuration:
+
+   ```bash
+   kubectl apply -f deployments/monitoring/cluster_monitor/configmap.yaml
+   ```
+
+4. Deploy the Cluster Monitor:
+
+   ```bash
+   kubectl apply -f deployments/monitoring/cluster_monitor/deployment.yaml
+   ```
+
+5. Verify the deployment:
+
+   ```bash
+   kubectl get pods -n monitoring -l app=cluster-monitor
+   kubectl logs -n monitoring -l app=cluster-monitor
+   ```
+
+## Prometheus Integration
+
+To set up Prometheus to scrape metrics from our applications:
+
+1. Ensure Prometheus is installed in your cluster:
+
+   ```bash
+   # Using Helm
+   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+   helm repo update
+   helm install prometheus prometheus-community/prometheus \
+     --namespace monitoring \
+     --set server.persistentVolume.enabled=false
+   ```
+
+2. Verify that Prometheus can discover our applications:
+
+   ```bash
+   # Port-forward to Prometheus UI
+   kubectl port-forward -n monitoring svc/prometheus-server 9090:80
+   ```
+
+   Then visit [http://localhost:9090/targets](http://localhost:9090/targets) to confirm that the pod-monitor and cluster-monitor targets are being scraped.
+
+3. Access the metrics endpoints directly:
+
+   ```bash
+   # Pod Monitor metrics
+   kubectl port-forward -n monitoring svc/pod-monitor 9090:9090
+   curl http://localhost:9090/metrics
+   
+   # Cluster Monitor metrics
+   kubectl port-forward -n monitoring svc/cluster-monitor 9091:9091
+   curl http://localhost:9091/metrics
+   ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Pod Monitor not starting**:
-   - Check the pod logs: `kubectl logs -n monitoring -l app=pod-monitor`
-   - Verify RBAC permissions are correct
-   - Ensure the ConfigMap exists and has the correct format
+1. **Pods not starting**:
+   - Check for image pull errors: `kubectl describe pod -n monitoring <pod-name>`
+   - Verify that the image is available in your registry
+   - Check for RBAC issues in the pod logs
 
-2. **VMware integration not working**:
-   - Verify VMware credentials in the secret
-   - Check network connectivity from the pod to the VMware host
-   - Ensure nodes are properly labeled with VM names
+2. **No metrics being collected**:
+   - Verify that the pod has the correct permissions
+   - Check the pod logs for connection errors
+   - Ensure the ConfigMap has the correct configuration
 
-3. **Missing metrics in Prometheus**:
-   - Verify the service is correctly exposing port 9090
-   - Check that Prometheus is configured to scrape the pod-monitor endpoint
-   - Verify the pod-monitor has the correct annotations for Prometheus discovery
-
-4. **Health checks failing**:
-   - Check the pod logs for any errors
-   - Verify the application is properly initialized
-   - Check if the `/health` endpoint is responding correctly
+3. **VMware integration issues**:
+   - See the [VMware Integration Guide](vmware_integration.md) for VMware-specific troubleshooting
 
 ### Logs and Debugging
 
-To increase log verbosity, update the ConfigMap:
+1. View Pod Monitor logs:
 
-```yaml
-data:
-  log_level: "DEBUG"
-```
+   ```bash
+   kubectl logs -f -n monitoring -l app=pod-monitor
+   ```
 
-Or set the environment variable:
+2. View Cluster Monitor logs:
 
-```yaml
-env:
-- name: POD_MONITOR_LOG_LEVEL
-  value: "DEBUG"
-```
+   ```bash
+   kubectl logs -f -n monitoring -l app=cluster-monitor
+   ```
 
-For more detailed troubleshooting, refer to the [setup.md](setup.md) and [development.md](development.md) documents.
+3. Increase log verbosity by setting `log_level: "DEBUG"` in the ConfigMap or using the environment variable `POD_MONITOR_LOG_LEVEL=DEBUG`.
