@@ -4,6 +4,7 @@
 This module serves as the entry point for the Pod Monitor application.
 """
 
+import json
 import logging
 import signal
 import sys
@@ -167,6 +168,7 @@ def monitor_iteration(config: Config) -> None:
             label_selector = ",".join([f"{k}={v}" for k, v in config.pod_label_selectors.items()])
             log.info(f"Using label selector: {label_selector}")
 
+        # Ensure we process namespaces in the order they are defined in config
         for namespace in config.namespaces:
             try:
                 pod_metrics = kubernetes_service.get_pods(namespace, label_selector=label_selector)
@@ -252,7 +254,9 @@ def health():
     status_code = 200
     if health_status.get("status") == "error":
         status_code = 500
-    return health_status
+    return Response(
+        content=json.dumps(health_status), status_code=status_code, media_type="application/json"
+    )
 
 
 @api_app.get("/metrics")

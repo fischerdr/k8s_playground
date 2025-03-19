@@ -2,8 +2,6 @@
 
 from datetime import datetime, timedelta
 
-import pytest
-
 from apps.monitoring.pod_monitor.models.metrics import (
     NodeMetric,
     NodeStatus,

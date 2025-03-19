@@ -2,8 +2,6 @@
 
 from unittest.mock import ANY, MagicMock, patch
 
-import pytest
-
 from apps.monitoring.pod_monitor.models.metrics import VMwareMetric
 from apps.monitoring.pod_monitor.services.vmware_service import VMwareMonitorService
 

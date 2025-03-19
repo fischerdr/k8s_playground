@@ -1,10 +1,8 @@
 """Test configuration and fixtures for unit tests."""
 
-import os
 from unittest.mock import MagicMock, patch
 
 import pytest
-from kubernetes import client
 
 
 @pytest.fixture

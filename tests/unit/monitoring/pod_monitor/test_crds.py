@@ -1,9 +1,8 @@
 """Unit tests for Custom Resource Definitions (CRDs)."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
-from kubernetes import client
 from kubernetes.client.exceptions import ApiException
 
 

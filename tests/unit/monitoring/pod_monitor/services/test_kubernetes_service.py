@@ -1,6 +1,6 @@
 """Unit tests for the Kubernetes service."""
 
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from kubernetes.client.exceptions import ApiException

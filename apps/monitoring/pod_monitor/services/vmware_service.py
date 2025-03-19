@@ -50,8 +50,10 @@ class VMwareMonitorService:
         """Connect to VMware vCenter or ESXi host."""
         try:
             if self.disable_ssl_verification:
-                context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+                context = ssl.SSLContext(ssl.PROTOCOL_TLS)
                 context.verify_mode = ssl.CERT_NONE
+                # Set minimum protocol version to TLSv1.2
+                context.minimum_version = ssl.TLSVersion.TLSv1_2
             else:
                 context = None
 
